@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ArchCAD Pro</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/PointerLockControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/utils/BufferGeometryUtils.js"></script>
+
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/workspace.css">
+    <link rel="stylesheet" href="css/navbar.css">
+    <link rel="stylesheet" href="css/navbarDrawerTabbed.css">
+    <link rel="stylesheet" href="css/sidebar.css">
+    <link rel="stylesheet" href="css/ui-3dwidget.css">
+    <link rel="stylesheet" href="css/studio.css">
+    <link rel="stylesheet" href="ProNavBar/ui-widget.css">
+    <link rel="stylesheet" href="ProNavBar/builderTools.css">
+    <link rel="stylesheet" href="ProNavBar/navActionBtn.css">
+
+    <link rel="stylesheet" href="ProNavBar/dragDropLibrary.css">
+</head>
+<body>
+
+    
+    
+    <!-- TOP NAVBAR -->
+    <div class="pro-studio-navbar">
+        <div class="nav-brand">
+            <span class="nav-logo-icon">📐</span>
+            <span class="nav-brand-text">ArchCAD</span>
+        </div>
+        <div class="nav-divider"></div>
+        
+        <div class="nav-view-switcher">
+            <button id="mode-2d" class="nav-switch-btn active" onclick="setWorkspaceLayout('2d')">2D</button>
+            <button id="mode-3d" class="nav-switch-btn" onclick="setWorkspaceLayout('3d')">3D</button>
+        </div>
+        <div class="nav-divider"></div>
+        <div class="nav-floor-controls" style="position: relative;">
+            <div id="top-floor-tabs" class="nav-floor-tabs"></div>
+            
+            <button class="nav-add-floor-btn" onclick="addManualFloor()" title="Add Floor">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+            </button>
+            <div class="nav-divider"></div>
+            <div id="nav-action-buttons" style="display: flex; align-items: center;"></div>
+            <div class="nav-divider"></div>
+            <button id="settings-btn" class="nav-add-floor-btn nav-settings-btn" title="Settings" onclick="toggleSettings()">
+                <span class="nav-settings-icon">⚙️</span>
+            </button>
+
+        </div>
+    </div>
+    
+    
+
+
+<!-- 🌟 NAVBAR EXPAND/COLLAPSE PULL TAB WITH DOWN ARROW -->
+    <button id="navbar-toggle-btn" class="navbar-toggle-btn" onclick="toggleNavbarDrawer()" title="Expand Secondary Drawer">
+        ▼
+    </button>
+    <!-- 🌟 DROPDOWN DRAWER (TABBED_LAYOUT) -->
+    <div id="nav-drawer" class="nav-drawer-panel">
+        
+        <!-- DRAWER HEADERS -->
+        <div class="drawer-tabs-header">
+            <button class="drawer-tab-btn active" onclick="switchDrawerTab(event, 'plot')">🏗️ PLOT</button>
+            <button class="drawer-tab-btn" onclick="switchDrawerTab(event, 'floors')">🏢 FLOORS</button>
+            <button class="drawer-tab-btn" onclick="switchDrawerTab(event, 'interiors')">🛋️ INTERIORS</button>
+            <button class="drawer-tab-btn" onclick="switchDrawerTab(event, 'controls')">⚙️ CONTROLS</button>
+        </div>
+
+        <div class="drawer-tabs-content">
+            
+            <!-- ========================================= -->
+            <!-- 🏗️ PLOT TAB CONTENT                       -->
+            <!-- ========================================= -->
+            <div id="drawer-tab-plot" class="drawer-tab-panel active">
+                <div class="input-grid">
+                    <div class="field">
+                        <label>Width:</label>
+                        <input type="number" id="inW" value="278" oninput="updateCanvas()">
+                    </div>
+                    <div class="field">
+                        <label>Depth:</label>
+                        <input type="number" id="inH" value="417" oninput="updateCanvas()">
+                    </div>
+                    <div class="field">
+                        <label>Main Road Placement:</label>
+                        <select id="roadSide" onchange="updateCanvas()" class="modern-select">
+                            <option value="east">⬇ East (Bottom)</option>
+                            <option value="west">⬆ West (Top)</option>
+                            <option value="north">➡ North (Right)</option>
+                            <option value="south">⬅ South (Left)</option>
+                            <option value="none">None</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label>Top Direction:</label>
+                        <select id="compassDir" onchange="handleCompassChange()" class="modern-select">
+                            <option>West</option>
+                            <option>South</option>
+                            <option>East</option>
+                            <option>North</option>
+                        </select>
+                    </div>
+                    <div class="field"><label>A (L / U):</label><div style="display: flex; gap: 4px;"><input type="number" id="aL" value="26" oninput="updateCanvas()"><input type="number" id="aU" value="28" oninput="updateCanvas()"></div></div>
+                    <div class="field"><label>B (R / U):</label><div style="display: flex; gap: 4px;"><input type="number" id="bR" value="75" oninput="updateCanvas()"><input type="number" id="bU" value="35" oninput="updateCanvas()"></div></div>
+                    <div class="field"><label>C (R / D):</label><div style="display: flex; gap: 4px;"><input type="number" id="cR" value="22" oninput="updateCanvas()"><input type="number" id="cD" value="33" oninput="updateCanvas()"></div></div>
+                    <div class="field"><label>D (L / D):</label><div style="display: flex; gap: 4px;"><input type="number" id="dL" value="51" oninput="updateCanvas()"><input type="number" id="dD" value="41" oninput="updateCanvas()"></div></div>
+                </div>
+            </div>
+
+            <!-- ========================================= -->
+            <!-- 🏢 FLOORS TAB CONTENT                     -->
+            <!-- ========================================= -->
+            <div id="drawer-tab-floors" class="drawer-tab-panel">
+                <div class="setting-card" style="padding: 8px; margin-bottom: 8px;">
+                    <div class="setting-group" style="grid-column: span 2;">
+                        <label class="setting-label">PARAPET STYLE</label>
+                        <select id="parapetStyleSelect" class="modern-select neo-sunken" onchange="if(typeof request3DUpdate === 'function') request3DUpdate();">
+                            <option value="premium-canopy">Premium Facade</option>
+                            <option value="modern-brown">Modern Brown & White</option>
+                            <option value="geo-interlock">Geometric Interlock</option>
+                            <option value="classic-curve">Classic Curves</option>
+                            <option value="modern-glass">Modern Glass</option>
+                            <option value="neo-brutalist">Neo-Brutalist (Fins & LEDs)</option>
+                            <option value="zen-pergola">Zen Pergola (Wood & Glass)</option>
+                            <option value="cyber-cantilever">Cyber Cantilever (Chrome)</option>
+                            <option value="standard">Standard Capped Wall</option>
+                            <option value="none">None (Flat Edge)</option>
+                        </select>
+                    </div>
+                </div>
+                <div style="display:flex; align-items:center; justify-content: space-between; gap: 4px; margin-bottom: 8px;">
+                    <div id="floor-tabs" style="display:flex; flex-wrap: wrap; gap:4px;">
+                        <button class="floor-btn active" data-floor="0" onclick="setFloor(0)">G</button>
+                    </div>
+                    <div style="display:flex; gap: 4px;">
+                        <button class="action-btn" onclick="addManualFloor()" title="Add New Floor" style="padding: 4px 6px; font-weight: bold; background: rgba(56, 189, 248, 0.1); color: #38bdf8; border: 1px dashed #38bdf8;">+ ADD</button>
+                        <button class="action-btn" onclick="deleteCurrentFloor()" title="Delete Current Floor" style="padding: 4px 6px; font-weight: bold; background: rgba(239, 68, 68, 0.1); color: #ef4444; border: 1px dashed #ef4444;">🗑️ DEL</button>
+                    </div>
+                </div>
+                
+                <div id="stair-warning" style="margin-top: 0; margin-bottom: 8px; padding: 4px;">⚠ Stairs must match across floors!</div>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin-bottom: 8px;">
+                    <button class="action-btn" onclick="toggle3D()" style="background: linear-gradient(135deg, #10b981, #059669); color: white; padding: 6px; font-size: 0.7rem;">👁️ 3D View</button>
+                    <button class="action-btn" onclick="cloneEntireFloor()" style="background: #6366f1; color: white; padding: 6px; font-size: 0.7rem;">🚀 Clone</button>
+                    <button class="action-btn" onclick="toggleTheme()" style="background: #6366f1; color: white; padding: 6px; font-size: 0.7rem;">🎨 Theme</button>
+                </div>
+
+                <div class="input-grid">
+                    <div class="field">
+                        <label>Measurement:</label>
+                        <select id="unitSelect" onchange="updateCanvas()" class="modern-select">
+                            <option value="in">Inches</option>
+                            <option value="cm">Centimeters</option>
+                            <option value="ftin">Ft & In</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label>Scale:</label>
+                        <input type="number" id="scaleInput" value="1.2" step="0.1" oninput="updateCanvas()">
+                    </div>
+                </div>
+                
+                <div class="neo-divider" style="margin: 10px 0;"></div>
+                
+                <div id="area-dashboard" style="display: flex; flex-direction: column; gap: 6px; font-size: 0.75rem; max-height: 120px; overflow-y: auto; padding-right: 4px;">
+                    <div style="color: #94a3b8; text-align: center;">Add rooms to see calculations...</div>
+                </div>
+                
+                <div class="neo-divider" style="margin: 10px 0;"></div>
+
+                <div class="global-toolbar" style="margin-top: 10px; display: flex; flex-direction: column; gap: 4px; padding: 6px;">
+                    <div style="display: flex; gap: 4px; width: 100%;">
+                        <button class="tool-btn" onclick="undoAction()" title="Undo"><span class="icon">⏪</span><span class="btn-label">Undo</span></button>
+                        <button class="tool-btn" onclick="redoAction()" title="Redo"><span class="icon">⏩</span><span class="btn-label">Redo</span></button>
+                        <button class="tool-btn" onclick="toggleMeasureMode()" title="Tape Measure"><span class="icon">📏</span><span class="btn-label">Measure</span></button>
+                    </div>
+                    <div style="display: flex; gap: 4px; width: 100%;">
+                        <button class="tool-btn" onclick="exportPDF()" title="Export PDF" style="border-bottom: 2px solid #f43f5e;">
+                            <span class="icon">📄</span><span class="btn-label">PDF</span>
+                        </button>
+                        <button id="btn-section" class="neo-btn" onclick="toggleSectionCut()" title="Draw Section Line">
+                            <span class="icon">✂️</span><span class="btn-label">Section</span>
+                        </button>
+                    </div>
+                </div>
+                <p style="font-size: 0.65rem; color: #10b981; margin-top: 8px; margin-bottom: 0; font-weight: bold; text-align: center;">🖱️ Scroll: Zoom | Mid-Click: Pan</p>
+            </div>
+
+            <!-- ========================================= -->
+            <!-- 🛋️ INTERIORS TAB CONTENT                  -->
+            <!-- ========================================= -->
+            <div id="drawer-tab-interiors" class="drawer-tab-panel">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                    <div style="display: flex; flex-direction: column; gap: 8px;">
+                        <label class="neo-label">ARCHITECTURE</label>
+                        <select id="elem-type" class="modern-select neo-sunken">
+                            <!-- Populated by JS -->
+                        </select>
+                        <button class="neo-btn" onclick="addElement()">+ ADD ROOM</button>
+                    </div>
+
+                    <div style="display: flex; flex-direction: column; gap: 8px;">
+                        <label class="neo-label">INTERIOR SCALE</label>
+                        <select id="furn-type" class="modern-select neo-sunken">
+                            <!-- Populated by JS -->
+                        </select>
+                        <button class="neo-btn primary-green" onclick="addElement(document.getElementById('furn-type').value)">
+                            + FURNITURE
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="neo-divider" style="margin: 10px 0;"></div>
+                
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                    <label class="neo-label">ROOM FIXTURES <span style="text-transform:none; font-weight:normal; opacity:0.5;">(Select Room First)</span></label>
+                    <div style="display: flex; gap: 12px;">
+                        <button class="neo-btn outline-yellow" onclick="addFixture('door')">🚪 DOOR</button>
+                        <button class="neo-btn outline-cyan" onclick="addFixture('window')">🪟 WINDOW</button>
+                    </div>
+                </div>
+                <div id="element-controls" style="margin-top: 15px;"></div>
+            </div>
+
+            <!-- ========================================= -->
+            <!-- ⚙️ CONTROLS TAB CONTENT  Toggles moved to Settings Menu (⚙️) -->
+            <!-- ========================================= -->
+            <div id="drawer-tab-controls" class="drawer-tab-panel">
+                <p style="font-size: 0.65rem; color: #10b981; margin-top: 8px; margin-bottom: 0; font-weight: bold; text-align: center;">🖱️ Scroll: Zoom | Mid-Click: Pan</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- FLOATING ADVANCED BUTTONS -->
+    <div class="adv-btn-container">
+        <button id="btn-room-studio" class="btn-adv-3d" onclick="RoomStudio.open()">
+            <span class="icon">🛋️</span> <span class="adv-text">ROOM STUDIO</span>
+        </button>
+        <!-- 🌟 UPDATED CLASS NAME BELOW -->
+        <button class="Adv3d_btn-adv-3d" onclick="Adv3D.toggleWorkspaceMode(true)">
+            <span class="icon">👁️</span> <span class="adv-text">ADVANCED 3D</span>
+        </button>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- 🌟 MAIN SPLIT SCREEN WORKSPACE -->
+    <!-- ========================================== -->
+    <div class="canvas-area workspace-wrapper" id="main-workspace">
+        <!-- LEFT CANVAS (2D Engine & Overlays) -->
+        <div id="canvas-wrapper" class="split-left">
+            <!-- right click Context Menu -->
+            <div id="context-menu"></div>
+            <!-- 🌟 GREEN SQUIRCLE CAMERA CONTROLS -->
+            <div id="camera-controls"></div>
+
+            <div id="drag-drop-library-wrapper"></div>
+            
+            <!-- ROOM TOOLTIP -->
+            <div id="room-tooltip" style="position: absolute; display: none; background: rgba(15, 23, 42, 0.9); color: #f8fafc; padding: 8px; border-radius: 6px; border: 1px solid #38bdf8; pointer-events: none; z-index: 1000; font-size: 12px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);"></div>
+            <!-- MAIN BLUEPRINT SVG -->
+            <svg id="blueprint" viewBox="0 0 1000 1000" preserveAspectRatio="xMidYMid meet">
+                <defs>
+                    <pattern id="smallGrid" width="12" height="12" patternUnits="userSpaceOnUse"><path d="M 12 0 L 0 0 0 12" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="0.5"/></pattern>
+                    <pattern id="grid" width="120" height="120" patternUnits="userSpaceOnUse">
+                        <rect width="120" height="120" fill="url(#smallGrid)"/>
+                        <path d="M 120 0 L 0 0 0 120" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+                    </pattern>
+                    <filter id="neonGlow" x="-20%" y="-20%" width="140%" height="140%">
+                        <feGaussianBlur stdDeviation="4" result="blur" />
+                        <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                    </filter>
+                </defs>
+                <text id="dir-top" x="500" y="40" text-anchor="middle" fill="#38bdf8" style="font-weight:bold; font-size:20px;">N</text>
+                <text id="dir-right" x="960" y="500" text-anchor="middle" fill="#38bdf8" style="font-weight:bold; font-size:20px;">E</text>
+                <g id="viewport">
+                    <rect x="-50000" y="-50000" width="100000" height="100000" fill="url(#grid)" />
+                    <polygon id="road-poly" fill="#334155" stroke="#94a3b8" stroke-width="2" stroke-dasharray="15,15" style="display:none;" />
+                    <text id="road-text" fill="#f8fafc" font-size="16" font-weight="bold" letter-spacing="4" text-anchor="middle" style="display:none; text-shadow: 1px 1px 2px #000;">MAIN ACCESS ROAD</text>
+                    <polygon id="outer-poly" class="outer-poly" />
+                    <rect id="inner-rect" class="inner-rect" />
+                    <g id="element-container"></g>
+                    <g id="dim-container"></g>
+                    <g id="site-offsets"></g>
+                </g>
+            </svg>
+        </div> <!-- END LEFT SPLIT -->
+
+        <!-- THE DRAGGABLE DIVIDER -->
+        <div class="split-resizer" id="split-resizer"></div>
+
+        <!-- RIGHT CANVAS (3D Engine & Overlays)-->
+        <div id="right-canvas-wrapper" class="split-right">
+            <div style="text-align: center;">
+                <span style="font-size: 3rem; opacity: 0.2;">🏗️</span>
+                <h3 style="color: #64748b; font-family: monospace; margin-top: 15px;">RIGHT CANVAS PLACEHOLDER</h3>
+            </div>
+
+            <div id="three-container" 
+                 style="position: absolute; top: 0; left: 0;
+                 width: 100%; height: 100%; z-index: 35; background: #0f172a;">
+            </div>
+
+            <!-- 3D Navigation Pad (Moved to right canvas) -->
+            <div id="nav-pad"></div>
+            
+        </div> <!-- END RIGHT SPLIT -->
+
+    </div> <!-- END MAIN WORKSPACE -->
+
+    <!-- WIDGETS SECTION (CONVERTER, COMPLIANCE, VASTU, SHORTCUT GUIDE)-->
+    <div id="qc-widget-wrapper"></div>
+    <div id="compliance-widget" class="minimized"></div>
+    <div id="vastu-widget" class="minimized"></div>
+    <div id="cheatsheet-widget"></div>
+    <div id="presentation-widget"></div>
+    <!-- WIDGETS SECTION (COMPLIANCE, VASTU, SHORTCUT GUIDE)-->
+
+    <script src="js/event.js"></script>
+    <script src="secrets.js"></script>
+    <script src="js/config.js"></script>
+    <script src="js/constants.js"></script>
+    <script src="js/state.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/furniture3d.js"></script>
+    <script src="js/engine3d-setup.js"></script>
+    <script src="js/engine3d-materials.js"></script>
+    <script src="js/engine3d-builders.js"></script>
+    <script src="js/engine3d.js"></script>
+    <script src="js/actions.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/studio.js"></script>
+    <script src="js/parapet.js"></script>
+    <script src="js/advanced3d.js"></script>
+    <script src="js/elevation.js"></script>
+    <script src="js/ui-3dwidget.js"></script>
+    <script src="js/onboarding.js"></script>
+    <!-- <script src="js/ai-agent.js"></script> -->
+    <script src="js/geometry.js"></script>
+    <script src="js/renderer2d.js"></script>
+    <script src="js/interactions.js"></script>
+
+    <script src="ProNavBar/builderTools.js"></script>
+    <script src="ProNavBar/canvasControls.js"></script>
+    <script src="ProNavBar/ui-widget.js"></script>
+    <script src="ProNavBar/navActionBtn.js"></script>
+
+    <script src="js/app.js"></script>
+    <script src="js/contextmenu.js"></script>
+
+    <script src="ProNavBar/dragDropLibrary.js"></script>
+
+</body>
+</html>

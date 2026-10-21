@@ -1,0 +1,347 @@
+// =========================================
+// ⏳ PHASE 3: DELTA STATE MANAGEMENT (state.js)
+// Modular Architecture
+// =========================================
+
+// -----------------------------------------
+// 1. CORE STATE & HISTORY MANAGER
+// -----------------------------------------
+const ProjectState = {
+    data: {
+        elements: [],
+        fixtures: [],
+        currentFloor: 0,
+        globalCompassDir: 'West',
+        selectedElIndex: -1
+    },
+    history: {
+        stack: [],       
+        redoStack: [],
+        baseState: null, 
+        clipboard: null,
+        MAX_HISTORY: 50  
+    },
+
+    _clone(obj) { 
+        return structuredClone(obj);  
+    },
+
+    _isElementChanged(oldEl, newEl) {
+        if (!oldEl || !newEl) return true;
+        return oldEl.x !== newEl.x || 
+               oldEl.y !== newEl.y || 
+               oldEl.w !== newEl.w || 
+               oldEl.h !== newEl.h || 
+               oldEl.floor !== newEl.floor ||
+               oldEl.rot !== newEl.rot || 
+               oldEl.customColor !== newEl.customColor ||
+               oldEl.customName !== newEl.customName ||
+               oldEl.material !== newEl.material ||
+               oldEl.locked !== newEl.locked ||
+               oldEl.stairStyle !== newEl.stairStyle ||
+               oldEl.dir !== newEl.dir;
+    },
+
+    _isFixtureChanged(oldFix, newFix) {
+        if (!oldFix || !newFix) return true;
+        return oldFix.offset !== newFix.offset ||
+               oldFix.size !== newFix.size ||
+               oldFix.edge !== newFix.edge ||
+               oldFix.roomId !== newFix.roomId ||
+               oldFix.type !== newFix.type;
+    },
+
+    _getDelta(oldState, newState) {
+        const delta = { elements: { length: newState.elements.length }, fixtures: { length: newState.fixtures.length } };
+        let hasChanges = false;
+        const maxEl = Math.max(oldState.elements.length, newState.elements.length);
+        for (let i = 0; i < maxEl; i++) {
+            const oldEl = oldState.elements[i];
+            const newEl = newState.elements[i];
+            if (this._isElementChanged(oldEl, newEl)) {
+                delta.elements[i] = newEl ? this._clone(newEl) : null;
+                hasChanges = true;
+            }
+        }
+        const maxFix = Math.max(oldState.fixtures.length, newState.fixtures.length);
+        for (let i = 0; i < maxFix; i++) {
+            const oldFix = oldState.fixtures[i];
+            const newFix = newState.fixtures[i];
+            if (this._isFixtureChanged(oldFix, newFix)) {
+                delta.fixtures[i] = newFix ? this._clone(newFix) : null;
+                hasChanges = true;
+            }
+        }
+        if (oldState.elements.length !== newState.elements.length || oldState.fixtures.length !== newState.fixtures.length) {
+            hasChanges = true;
+        }
+        return hasChanges ? delta : null;
+    },
+
+    _applyDelta(state, delta) {
+        const newState = this._clone(state);
+        if (delta.elements) {
+            for (let i in delta.elements) {
+                if (i === 'length') continue;
+                newState.elements[i] = delta.elements[i] ? this._clone(delta.elements[i]) : null;
+            }
+            newState.elements.length = delta.elements.length; 
+        }
+        if (delta.fixtures) {
+            for (let i in delta.fixtures) {
+                if (i === 'length') continue;
+                newState.fixtures[i] = delta.fixtures[i] ? this._clone(delta.fixtures[i]) : null;
+            }
+            newState.fixtures.length = delta.fixtures.length;
+        }
+        return newState;
+    },
+
+    _buildStateFromHistory(targetIndex) {
+        if (!this.history.baseState) return { elements: [], fixtures: [] };
+        let state = this._clone(this.history.baseState);
+        for (let i = 0; i <= targetIndex; i++) {
+            state = this._applyDelta(state, this.history.stack[i].delta);
+        }
+        return state;
+    },
+
+    saveState(actionName = "Action Executed") {
+        const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const currentState = { elements: this.data.elements, fixtures: this.data.fixtures };
+        if (!this.history.baseState) {
+            this.history.baseState = this._clone(currentState);
+            return;
+        }
+        const lastState = this.history.stack.length > 0
+            ? this._buildStateFromHistory(this.history.stack.length - 1)
+            : this.history.baseState;
+        const delta = this._getDelta(lastState, currentState);
+        if (!delta) return;
+
+        const hist = this.history.stack;
+        if (hist.length > 0 && actionName === "Moved Element" && hist[hist.length - 1].action === "Moved Element") {
+            const stateBeforeMove = hist.length > 1 ? this._buildStateFromHistory(hist.length - 2) : this.history.baseState;
+            const updatedDelta = this._getDelta(stateBeforeMove, currentState);
+            if (updatedDelta) {
+                hist[hist.length - 1].delta = updatedDelta;
+                hist[hist.length - 1].time = timeStr;
+            }
+            if (typeof renderTimeMachine === 'function') renderTimeMachine();
+            return;
+        }
+        hist.push({ action: actionName, time: timeStr, delta: delta });
+        this.history.redoStack = [];
+        if (hist.length > this.history.MAX_HISTORY) {
+            const oldestItem = hist.shift();
+            this.history.baseState = this._applyDelta(this.history.baseState, oldestItem.delta);
+        }
+        if (typeof renderTimeMachine === 'function') renderTimeMachine();
+    },
+
+    undo() {
+        if (this.history.stack.length > 0) {
+            const popped = this.history.stack.pop();
+            this.history.redoStack.push(popped);
+            const restoredState = this.history.stack.length > 0
+                ? this._buildStateFromHistory(this.history.stack.length - 1)
+                : this.history.baseState;
+
+            this.data.elements = this._clone(restoredState.elements);
+            this.data.fixtures = this._clone(restoredState.fixtures);
+            if (this.data.selectedElIndex >= this.data.elements.length) {
+                this.data.selectedElIndex = -1;
+            }
+            return true;
+        }
+        return false;
+    },
+
+    redo() {
+        if (this.history.redoStack.length > 0) {
+            const item = this.history.redoStack.pop();
+            this.history.stack.push(item);
+            const restoredState = this._buildStateFromHistory(this.history.stack.length - 1);
+            this.data.elements = this._clone(restoredState.elements);
+            this.data.fixtures = this._clone(restoredState.fixtures);
+            if (this.data.selectedElIndex >= this.data.elements.length) {
+                this.data.selectedElIndex = -1;
+            }
+            return true;
+        }
+        return false;
+    },
+
+    jumpToTime(index) {
+        if (index < 0 || index >= this.history.stack.length) return false;
+        const toRedo = this.history.stack.splice(index + 1);
+        toRedo.reverse().forEach(item => this.history.redoStack.push(item));
+        const restoredState = this._buildStateFromHistory(index);
+        this.data.elements = this._clone(restoredState.elements);
+        this.data.fixtures = this._clone(restoredState.fixtures);
+        if (typeof renderSidebar === 'function') renderSidebar();
+        if (typeof updateCanvas === 'function') updateCanvas(true);
+        if (typeof renderTimeMachine === 'function') renderTimeMachine();
+
+        return true;
+    },
+    
+    deleteElement(idx) {
+        const el = this.data.elements[idx];
+        const elName = el ? (el.customName || el.type.toUpperCase()) : "Element";
+        
+        this.commit(`Deleted ${elName}`, () => {
+            this.data.elements.splice(idx, 1);
+            this.data.fixtures = this.data.fixtures.filter(f => f.roomId !== idx);
+            this.data.fixtures.forEach(f => { if (f.roomId > idx) f.roomId--; });
+            
+            if (this.data.selectedElIndex === idx) this.data.selectedElIndex = -1;
+            else if (this.data.selectedElIndex > idx) this.data.selectedElIndex--;
+        });
+    },
+
+    updateElement(idx, newData, actionName = "Updated Element") {
+        this.commit(actionName, () => {
+            // Safely merge the new data into the existing element
+            Object.assign(this.data.elements[idx], newData);
+        });
+    },
+
+    updateFixture(idx, newData, actionName = "Updated Fixture") {
+        this.commit(actionName, () => {
+            // Safely merge the new data into the existing fixture
+            Object.assign(this.data.fixtures[idx], newData);
+        });
+    },
+
+    commit(actionName, mutationCallback) {
+        mutationCallback();
+        this.saveState(actionName);
+        if (typeof AppEvents !== 'undefined') {
+            AppEvents.triggerStateChange();
+        }
+    }
+};
+
+// Map Global Variables to the State Manager
+['elements', 'fixtures', 'currentFloor', 'globalCompassDir', 'selectedElIndex'].forEach(key => {
+    Object.defineProperty(window, key, {
+        get: () => ProjectState.data[key],
+        set: (value) => { ProjectState.data[key] = value; }
+    });
+});
+Object.defineProperty(window, 'clipboard', {
+    get: () => ProjectState.history.clipboard,
+    set: (value) => { ProjectState.history.clipboard = value; }
+});
+
+
+// -----------------------------------------
+// 2. STORAGE ENGINE (IndexedDB & Auto-Save)
+// -----------------------------------------
+const StorageEngine = {
+    DB_NAME: 'ArchCAD_Storage',
+    STORE_NAME: 'autosaves',
+    dbNeedsSave: false,
+
+    initDB() {
+        return new Promise((resolve, reject) => {
+            const request = indexedDB.open(this.DB_NAME, 1);
+            request.onupgradeneeded = (e) => e.target.result.createObjectStore(this.STORE_NAME);
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+        });
+    },
+
+    async saveToMemory() {
+        const data = {
+            elements: elements, fixtures: fixtures,
+            inW: document.getElementById('inW')?.value || 278,
+            inH: document.getElementById('inH')?.value || 417,
+            floors: document.getElementById('b-floors')?.value || 1
+        };
+        try {
+            const db = await this.initDB();
+            const tx = db.transaction(this.STORE_NAME, 'readwrite');
+            tx.objectStore(this.STORE_NAME).put(data, 'latest_session');
+        } catch (e) {
+            console.warn("Async save failed. Falling back to LocalStorage.", e);
+            localStorage.setItem('ArchCAD_AutoSave', JSON.stringify(data));
+        }
+    },
+
+    async loadFromMemory() {
+        try {
+            const db = await this.initDB();
+            const tx = db.transaction(this.STORE_NAME, 'readonly');
+            const request = tx.objectStore(this.STORE_NAME).get('latest_session');
+            
+            request.onsuccess = () => {
+                const data = request.result;
+                if (!data && !localStorage.getItem('ArchCAD_AutoSave')) return; 
+                const wantsToRestore = confirm("💾 A previous session was found.\n\nWould you like to restore your last design?");
+                if (wantsToRestore) {
+                    const finalData = data || JSON.parse(localStorage.getItem('ArchCAD_AutoSave'));
+                    if (finalData && finalData.elements && finalData.elements.length > 0) {
+                        elements = finalData.elements;
+                        fixtures = finalData.fixtures || [];
+                        if (finalData.inW && document.getElementById('inW')) document.getElementById('inW').value = finalData.inW;
+                        if (finalData.inH && document.getElementById('inH')) document.getElementById('inH').value = finalData.inH;
+                        let maxFloor = 0;
+                        elements.forEach(el => { if (el.floor > maxFloor) maxFloor = el.floor; });
+                        if (document.getElementById('b-floors')) document.getElementById('b-floors').value = maxFloor + 1;
+                        if (typeof setFloor === 'function') setFloor(currentFloor || 0);
+                        if (typeof renderSidebar === 'function') renderSidebar();
+                        if (typeof updateCanvas === 'function') updateCanvas(false); 
+                    }
+                } else {
+                    db.transaction(this.STORE_NAME, 'readwrite').objectStore(this.STORE_NAME).delete('latest_session');
+                    localStorage.removeItem('ArchCAD_AutoSave');
+                }
+            };
+        } catch (e) { 
+            console.error("Async load failed.", e); 
+        }
+    },
+
+    markDirty() {
+        this.dbNeedsSave = true;
+    },
+
+    startThrottler() {
+        setInterval(() => {
+            if (this.dbNeedsSave) {
+                this.saveToMemory();
+                this.dbNeedsSave = false;
+                console.log("💾 Throttled Auto-Save Complete.");
+            }
+        }, 5000);
+    }
+};
+StorageEngine.startThrottler();
+
+
+
+// -----------------------------------------
+// 4. GLOBAL BRIDGE (HTML ONCLICK BINDINGS)
+// -----------------------------------------
+window.undoAction = () => {
+    ProjectState.undo();
+    if (typeof renderSidebar === 'function') renderSidebar();
+    if (typeof updateCanvas === 'function') updateCanvas();
+};
+
+window.redoAction = () => {
+    ProjectState.redo();
+    if (typeof renderSidebar === 'function') renderSidebar();
+    if (typeof updateCanvas === 'function') updateCanvas();
+};
+
+window.saveToMemory = () => StorageEngine.saveToMemory();
+window.loadFromMemory = () => StorageEngine.loadFromMemory();
+window.markStateDirty = () => StorageEngine.markDirty();
+
+
+window.saveState = (actionName) => {
+    if (typeof ProjectState !== 'undefined') ProjectState.saveState(actionName);
+};
